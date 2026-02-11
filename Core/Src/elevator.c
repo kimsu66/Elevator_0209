@@ -7,6 +7,8 @@
 
 
 #include "elevator.h"
+#include "led.h"
+#include "stepper.h"
 
 COM ele;
 BUD fl;
@@ -21,9 +23,11 @@ BTNN BTN_data[12] =
     {GPIOD, GPIO_PIN_2,bt_released,0,0},
     // down
     {GPIOC, GPIO_PIN_2,bt_released,0,0},
-    {GPIOC, GPIO_PIN_1,bt_released,0,0},
+//    {GPIOC, GPIO_PIN_1,bt_released,0,0},
+		{GPIOA, GPIO_PIN_4,bt_released,0,0},
     {GPIOC, GPIO_PIN_3,bt_released,0,0},
-    {GPIOC, GPIO_PIN_0,bt_released,0,0},
+//    {GPIOC, GPIO_PIN_0,bt_released,0,0},
+		{GPIOC, GPIO_PIN_4,bt_released,0,0},
 
     {GPIOB, GPIO_PIN_4,bt_released,0,0},
     {GPIOB, GPIO_PIN_5,bt_released,0,0},
@@ -32,26 +36,26 @@ BTNN BTN_data[12] =
 };
 
 
-//LEDD LED_data[8]=
-//{
-//    {GPIOC,GPIO_PIN_8},
-//    {GPIOC,GPIO_PIN_6},
-//    {GPIOC,GPIO_PIN_5},
-//    {GPIOA,GPIO_PIN_12},
-//    {GPIOA,GPIO_PIN_11},
-//    {GPIOB,GPIO_PIN_12},
-//    {GPIOB,GPIO_PIN_2},
-//    {GPIOB,GPIO_PIN_10}
-//};
-
-
-Photo photo_data[TOP] =
+LEDD LED_data[8]=
 {
-    {GPIOA,GPIO_PIN_0},
-    {GPIOA,GPIO_PIN_1},
-    {GPIOA,GPIO_PIN_4},
-    {GPIOB,GPIO_PIN_0},
+    {GPIOC,GPIO_PIN_8},
+    {GPIOC,GPIO_PIN_6},
+    {GPIOC,GPIO_PIN_5},
+    {GPIOA,GPIO_PIN_12},
+    {GPIOA,GPIO_PIN_11},
+    {GPIOB,GPIO_PIN_12},
+    {GPIOB,GPIO_PIN_2},
+    {GPIOB,GPIO_PIN_10}
 };
+
+
+//Photo photo_data[TOP] =
+//{
+//    {GPIOA,GPIO_PIN_9},
+//    {GPIOA,GPIO_PIN_1},
+//    {GPIOA,GPIO_PIN_4},
+//    {GPIOB,GPIO_PIN_0},
+//};
 
 
 bool btn_tPressed(uint8_t num)
@@ -174,48 +178,103 @@ void res(COM *ele, BUD * fl)
 
 // 현재층을 밷는 함수
 // 절차무시하고 포토 인터럽트 찍힌 곳을 위치로 할당
-//void fl_check(COM *ele, BUD *fl)
+void fl_check(COM *ele, BUD *fl)
+{
+  for(uint8_t i=0; i<TOP;i++)
+  {
+    if(HAL_GPIO_ReadPin(photo_data[i].port, photo_data[i].pin))
+    {
+      ele->num[0].current = i;
+    }
+  }
+}
+
+
+// 처음 명령에 강하게 의존해야 한다.
+// 1. 나보다 높은층에서 위로 버튼을 누른다. 그러면 위로 가면서 모든 위층들을 쓸면서 간다.
+// 2. 나보다 낮은 층에서 아래로 버튼을 누른다. 그러면 아래로 가면서 모든 아래층을 쓸면서 간다.
+// 3. 나보다 높은 층에서 아래로 버튼을 누른다. 그러면 신호들을 다 무시하고 해당층에서 도착해서 아래로 쓸면서 간다.
+// 4. 나보다 낮은 층에서 위로 버튼을 누른다. 그러면 신호들을 다 무시하고 해당층에 도착해서 위로 쓸면서 간다.
+//void Do(COM *ele,BUD*fl)
 //{
-//  for(uint8_t i=0; i<TOP;i++)
+//  int idx = ele->num[0].current;
+//  // prestate == abs_up, abs_down일때 여기서 우선순위를 조정해줘야 한다.
+//  if(ele->num[0].prestate == abs_up)
 //  {
-//    if(HAL_GPIO_ReadPin(photo_data[i].port, photo_data[i].pin))
+//    ele->num[0].prestate = idle; // 딱 한번만 실행.
+//    for(int i=idx+1; i < TOP;i++)
 //    {
-//      ele->num[0].current = i;
+//      if(fl->floor[i].upstate == fl_Up || ele->num[0].reserve[i] == ele_busy)
+//      {
+//        ele->num[0].seq_idx = i;
+//        ele->num[0].goal = i;
+//        ele->num[0].state = go_up;
+//        return;
+//      }
 //    }
 //  }
-//}
-//
-//void fl_check(COM *ele, BUD *fl)
-//{
-//    for(uint8_t i=0; i<TOP;i++)
+//  else if(ele->num[0].prestate == abs_down)
+//  {
+//    ele->num[0].prestate = idle;
+//    for(int i=idx-1; i >= 0;i--)
 //    {
-//        if(HAL_GPIO_ReadPin(photo_data[i].port, photo_data[i].pin))
-//        {
-//            ele->num[0].current = i;
-////            return;
-//        }
+//      if(fl->floor[i].upstate == fl_Down || ele->num[0].reserve[i] == ele_busy)
+//      {
+//        ele->num[0].seq_idx = i;
+//        ele->num[0].goal = i;
+//        ele->num[0].state = go_down;
+//        return;
+//      }
 //    }
-//}
-//void fl_check(COM *ele, BUD *fl)
-//{
-//    for(uint8_t i=0; i<TOP; i++)
+//  }
+//  else
+//  {
+//    //절대명령으로 기억. 따라서 예약이 없을때 반드시 IDLE상태에 진입해야 한다
+//    for(int i=0;i<idx;i++)
 //    {
-//        // 센서가 확실히 감지되었을 때만 (Active High: 1)
-//        if(HAL_GPIO_ReadPin(photo_data[i].port, photo_data[i].pin) == GPIO_PIN_SET)
-//        {
-//            // 현재 저장된 층과 다를 때만 갱신 (불필요한 쓰기 방지)
-//            if(ele->num[0].current != i)
-//            {
-//                ele->num[0].current = i;
-//            }
-//            // 한 번이라도 감지된 층이 있다면, 나머지 루프를 돌 필요 없이 나갑니다.
-//            // (엘리베이터가 두 층에 동시에 있을 순 없으므로 우선순위 고정)
-//            return;
-//        }
+//      if(fl->floor[i].upstate == fl_Up) // 나보다 아래층에서 위로 올라가는 명령이 있다면 다른거 다 무시하고 도착 후 go_up
+//      {
+//        ele->num[0].absol_idx = i;
+//        ele->num[0].seq_idx = i; // Open 에서 이를 비교하는 로직이 있음
+//        ele->num[0].state = abs_up;
+//        return;
+//      }
 //    }
-//    // 아무 센서도 안 눌렸을 때는(층 사이 이동 중) 기존 ele->num[0].current를 유지함.
+//    // 자 그렇지 않으면 일반 명령 기억
+//    // 새롭게 seq_idx를 설정할꺼야 이렇게 설정해서 중간 골값에 덧씌워지지 않게 할꺼야 적절하게 초기화 해야 해.
+//    for(int i=idx+1; i<TOP;i++)
+//    {
+//      if(fl->floor[i].upstate == fl_Up || ele->num[0].reserve[i] == ele_busy)
+//      {
+//        ele->num[0].seq_idx = i;
+//        ele->num[0].goal = i;             // 일단 추가.
+//        ele->num[0].state = go_up;
+//        return;
+//      }
+//    }
+//    for(int i=idx+1; i<TOP;i++)
+//    {
+//      if(fl->floor[i].downstate == fl_Down) // 내 위층에서 내려가는 명령이 걸리면 다 무시하고 도착 후 go_down
+//      {
+//        ele->num[0].absol_idx = i;
+//        ele->num[0].seq_idx = i;
+//        ele->num[0].state = force_down;
+//        return;
+//      }
+//    }
+//    for(int i=0; i<idx;i++)
+//    {
+//      if(fl->floor[i].downstate == fl_Down || ele->num[0].reserve[i] == ele_busy)
+//      {
+//        ele->num[0].seq_idx = i;
+//        ele->num[0].goal = i;             // 일단 추가
+//        ele->num[0].state = go_down;
+//        return;
+//      }
+//    }
+//  }
+//  // 예약없음
 //}
-
 
 
 // for문의 우선탐색 순서는 엘레베이터 기준임.
@@ -223,7 +282,7 @@ void Do(COM *ele,BUD*fl)
 {
   int idx = ele->num[0].current;
   // prestate == abs_up, abs_down일때 여기서 우선순위를 조정해줘야 한다.
-  if(ele->num[0].prestate == abs_up)
+  if(ele->num[0].prestate == force_up)
   {
     ele->num[0].prestate = idle; // 딱 한번만 실행.
     for(int i=idx+1; i < TOP;i++)
@@ -237,7 +296,7 @@ void Do(COM *ele,BUD*fl)
       }
     }
   }
-  else if(ele->num[0].prestate == abs_down)
+  else if(ele->num[0].prestate == force_down)
   {
     ele->num[0].prestate = idle;
     for(int i=idx-1; i >= 0;i--)
@@ -282,7 +341,7 @@ void Do(COM *ele,BUD*fl)
       {
         ele->num[0].absol_idx = i;
         ele->num[0].seq_idx = i; // Open 에서 이를 비교하는 로직이 있음
-        ele->num[0].state = abs_up;
+        ele->num[0].state = force_up;
         return;
       }
     }
@@ -292,24 +351,34 @@ void Do(COM *ele,BUD*fl)
       {
         ele->num[0].absol_idx = i;
         ele->num[0].seq_idx = i;
-        ele->num[0].state = abs_down;
+        ele->num[0].state = force_down;
         return;
       }
     }
   }
   // 예약없음
+  if(fl->floor[idx].upstate == fl_Up || fl->floor[idx].downstate == fl_Down || ele->num[0].reserve[idx] == ele_busy)
+  {
+  	ele->num[0].prestate = idle;
+  	ele->num[0].state = waiting;
+  	return;
+  }
 }
 
 
 void MT(COM*ele, Stepper_t *motor)
 {
-  if(ele->num[0].state == go_up || ele->num[0].state == abs_down)
+  if(ele->num[0].state == go_up || ele->num[0].state == force_down)
   {
-    Stepper_Start(motor,2, DIR_CCW,1100);
+  	rotateDegrees(2, 1);
+//    Stepper_Start(motor,2, DIR_CW,700);
+//    ledLeftShift_Task(8);
   }
-  else if(ele->num[0].state == go_down || ele->num[0].state == abs_up)
+  else if(ele->num[0].state == go_down || ele->num[0].state == force_up)
   {
-    Stepper_Start(motor,2, DIR_CW,1100);
+  	rotateDegrees(2, 0);
+//    Stepper_Start(motor,2, DIR_CCW,700);
+//    ledRightShift_Task(8);
   }
 }
 
@@ -350,17 +419,30 @@ bool preGoal(COM*ele,BUD*fl)
 void ABSGoing(COM *ele,BUD *fl, Stepper_t *motor)
 {
   uint8_t idx = ele->num[0].current; // 체크함수가 있음
-
+  static uint8_t f_flag = 0;
   // 강제이동 명령이 취소되었으면 중간에 정지(강제이동은 최초의 예약에만 적용되므로 idle상태 진입할때 안에 사람이 없다고 가정) ================
-  if((fl->floor[ele->num[0].absol_idx].upstate == fl_none && ele->num[0].state == abs_up) ||
-     (fl->floor[ele->num[0].absol_idx].downstate == fl_none && ele->num[0].state == abs_down))
+//  if((fl->floor[ele->num[0].absol_idx].upstate == fl_none && ele->num[0].state == force_up) ||
+//     (fl->floor[ele->num[0].absol_idx].downstate == fl_none && ele->num[0].state == force_down))
+//  {
+//    ele->num[0].state = idle;
+//    return;
+//  }
+  // force_up은 하강상태임.
+  if(!f_flag && fl->floor[ele->num[0].absol_idx].upstate == fl_none && ele->num[0].state == force_up)
   {
-    ele->num[0].state = idle;
-    return;
+    f_flag = 1;
+    ele->num[0].absol_idx = idx - 1;
   }
+  else if(!f_flag && fl->floor[ele->num[0].absol_idx].downstate == fl_none && ele->num[0].state == force_down)
+  {
+    f_flag = 1;
+    ele->num[0].absol_idx = idx + 1;
+  }
+
 
   if(ele->num[0].absol_idx == idx)
   {
+    f_flag = 0;
     ele->num[0].prestate = ele->num[0].state;    // 이전 상태를 기억
     ele->num[0].state = waiting;
   }
@@ -413,77 +495,110 @@ void Going(COM *ele,BUD *fl, Stepper_t *motor)
 
   uint8_t idx = ele->num[0].current;
   uint8_t seq = ele->num[0].seq_idx;
+  static uint8_t a_flag = 0;
 
   // seq_idx가 예약 취소되있는 경우
   // 1. 상승중이면서 위쪽 예약이 취소된경우
   // 2. 하강중이면서 아래쪽 예약이 취소된경우
   // 3. 엘레베이터 예약이 걸린 경우-층 에약과 무관하게 idle로 가면 안된다.
-  if(((ele->num[0].state == go_up && fl->floor[seq].upstate == fl_none && ele->num[0].reserve[seq] == ele_none) ||
-
-       (ele->num[0].state == go_down && fl->floor[seq].downstate == fl_none&& ele->num[0].reserve[seq] == ele_none)))
+//  if(((ele->num[0].state == go_up && fl->floor[seq].upstate == fl_none && ele->num[0].reserve[seq] == ele_none) ||
+//
+//       (ele->num[0].state == go_down && fl->floor[seq].downstate == fl_none&& ele->num[0].reserve[seq] == ele_none)))
+//  {
+//    // 최선은 근
+//    ele->num[0].state = idle;
+//    return;
+//  }
+  // 1->3취소 2층멈춤 됨
+  // 1->3가면 4로감...
+  if( !a_flag && ele->num[0].state == go_up && fl->floor[seq].upstate == fl_none && ele->num[0].reserve[seq] == ele_none)
   {
-    ele->num[0].state = idle;
-    return;
+    // 최선은 근
+    a_flag = 1;
+    ele->num[0].seq_idx = idx + 1;
   }
-
+  else if(!a_flag &&ele->num[0].state == go_down && fl->floor[seq].downstate == fl_none&& ele->num[0].reserve[seq] == ele_none)
+  {
+    ele->num[0].seq_idx = idx - 1;
+    a_flag = 1;
+  }
 
   if(idx == ele->num[0].seq_idx || idx == ele->num[0].goal)
   {
+    a_flag = 0;
     ele->num[0].prestate = ele->num[0].state;
     ele->num[0].state = waiting;
     return;
   }
 
-  Goal(ele, fl); // 순서 변경 금지
+  if(!a_flag)
+  {
+    Goal(ele, fl); // 순서 변경 금지
+  }
 
   MT(ele,motor);
 
 }
 
 
-
 // 자 절대로 온경우와 일반으로 온 경우가 있다.
 void Open(COM * ele, BUD * fl)
 {
   uint8_t idx = ele->num[0].current;
-  // 예약 지우기 - 절대명령은 층에서 하는것이 아닌 엘레베이터에서 인식하는 것임 제거는 똑같이
-  if(ele->num[0].prestate == go_up || ele->num[0].prestate == abs_up)
+  static uint8_t flag = 0;
+  if(!flag)
   {
-    fl->floor[idx].upstate = fl_none;
-//    HAL_GPIO_WritePin(LED_data[idx].port, LED_data[idx].pin, 0);
+  	flag = 1;
+    // 예약 지우기 - 절대명령은 층에서 하는것이 아닌 엘레베이터에서 인식하는 것임 제거는 똑같이
+    if(ele->num[0].prestate == go_up || ele->num[0].prestate == force_up)
+    {
+      fl->floor[idx].upstate = fl_none;
+      HAL_GPIO_WritePin(LED_data[idx].port, LED_data[idx].pin, 0);
+    }
+    else if(ele->num[0].prestate == go_down || ele->num[0].prestate == force_down)
+    {
+      fl->floor[idx].downstate = fl_none;
+    }
+    else if(ele->num[0].prestate == idle)
+    {
+    	if(fl->floor[idx].upstate == fl_Up)
+    	{
+    		fl->floor[idx].upstate = fl_none;
+    	}
+    	else if(fl->floor[idx].downstate == fl_Down)
+    	{
+    		fl->floor[idx].downstate = fl_none;
+    	}
+    }
+    ele->num[0].reserve[idx] = ele_none;
+    HAL_GPIO_WritePin(LED_data[idx+TOP].port, LED_data[idx+TOP].pin, 0);
   }
-  else if(ele->num[0].prestate == go_down || ele->num[0].prestate == abs_down)
-  {
-    fl->floor[idx].downstate = fl_none;
-  }
-  ele->num[0].reserve[idx] = ele_none;
-//  HAL_GPIO_WritePin(LED_data[idx+TOP].port, LED_data[idx+TOP].pin, 0);
+
 
   // start 타이머
-  static uint8_t flag = 0;
   static uint32_t prevTime = 0;
-  if(flag == 0)
-  {
-    flag = 1;
-    prevTime = HAL_GetTick();
-  }
-  else if(flag == 1 && ((HAL_GetTick() - prevTime) > 5000))
+  if(flag == 1)
   {
     flag = 2;
+    prevTime = HAL_GetTick();
+  }
+  else if(flag == 2 && ((HAL_GetTick() - prevTime) > 5000))
+  {
+    flag = 3;
   }
   // 타이머 end
 
-  if(flag == 2)
+  if(flag == 3)
   {
     // 반드시 위로 올라간다.- 근데 예약된게 없으면 IDLE
-    if(ele->num[0].prestate == abs_up)
+    if(ele->num[0].prestate == force_up)
     {
       flag = 0;
       ele->num[0].state = idle; // Do 함수에서 우선순위 스캔을 해줘야 한다.
       return;
       // 여기서 위의 예약이 시간이 지나기 전에 갱신되지 않으면 아래예약을 볼 수 밖에 없음.
     }
-    else if(ele->num[0].prestate == abs_down)
+    else if(ele->num[0].prestate == force_down)
     {
       flag = 0;
       ele->num[0].state = idle;
@@ -501,13 +616,17 @@ void Open(COM * ele, BUD * fl)
       return;
     }
 
-//    // 일반 순항모드는 위를 판단한다.
-//    if(preGoal(ele, fl))
-//    {
-//      flag = 0;
-//      return;
-//    }
-    // 전부 아닌 경우는 그냥 idle로 가자.(재판단해)
+    if(preGoal(ele,fl) == false)
+    {
+    	if(fl->floor[idx].upstate == fl_Up)
+    	{
+    		fl->floor[idx].upstate = fl_none;
+    	}
+    	else if(fl->floor[idx].downstate == fl_Down)
+    	{
+    		fl->floor[idx].downstate = fl_none;
+    	}
+    }
     flag = 0;
     ele->num[0].state = idle;
     return;

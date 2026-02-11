@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -31,6 +32,7 @@
 
 #include "led.h"
 #include "segment.h"
+#include "i2c_lcd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,8 +64,14 @@ void SystemClock_Config(void);
 
 
 // uart
+//int _write(int file, char* p, int len){
+//    HAL_UART_Transmit(&huart2, (char *)p, len, 10);
+//    return len;
+//}
+
 int _write(int file, char* p, int len){
-    HAL_UART_Transmit(&huart2, (char *)p, len, 10);
+    // (char *)p를 (uint8_t *)p로 변경
+    HAL_UART_Transmit(&huart2, (uint8_t *)p, len, 10);
     return len;
 }
 
@@ -115,10 +123,17 @@ int main(void)
   MX_TIM11_Init();
   MX_USART2_UART_Init();
   MX_TIM10_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start(&htim11);                // delay_us
   HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1); // Ultrasonic waves
+
+  i2c_lcd_init();
+//  move_cursor(0, 0);
+//  lcd_string("Hello ARM");
+//  move_cursor(1, 0);
+//  lcd_string("good STM");
 
   // 엘베의 현재위치값으로 초기화.
   //fl_check(&ele, &fl);
@@ -161,32 +176,42 @@ int main(void)
     {
       case(idle) :
       {
-        ledOff(8);
+      	LCD_UpdateStatus("Door is Closed");
+//        ledOff(8);
         Do(&ele,&fl);
         break;
       }
-      case(abs_up):
+      case(force_up):
 	{
-//      	ledLeftShift_Task(8);
+      	LCD_UpdateStatus("Now moving DOWN");
+//      	ledRightShift_Task(8);
+      	ABSGoing(&ele, &fl, &stepper);
+      	break;
 	}
-      case(abs_down):
+      case(force_down):
       {
-//        ledRightShift_Task(8);
+      	LCD_UpdateStatus("Now moving UP");
+        ledLeftShift_Task(8);
         ABSGoing(&ele, &fl, &stepper);
         break;
       }
       case(go_up) : // 위로
 	{
+      	LCD_UpdateStatus("Now moving UP ");
       	ledLeftShift_Task(8);
+      	Going(&ele, &fl,&stepper);
+      	break;
 	}
       case(go_down): // AI
       {
+      	LCD_UpdateStatus("Now moving DOWN ");
         ledRightShift_Task(8);
         Going(&ele, &fl,&stepper);
         break;
       }
       case(waiting) :
       {
+      	LCD_UpdateStatus("Door Opening...");
         ledOff(8);
         Open(&ele, &fl);
         break;
@@ -263,7 +288,7 @@ void DEBUG_ElevatorStatus(uint8_t STT)
 
     printf("\r\nFloor:  Current[%d] -> Goal[%d]", ele.num[0].current + 1, ele.num[0].goal + 1);
 
-    if (STT == abs_up || STT == abs_down) {
+    if (STT == force_up || STT == force_down) {
         printf(" (Target: %dF)", ele.num[0].absol_idx + 1);
     }
 
@@ -272,7 +297,7 @@ void DEBUG_ElevatorStatus(uint8_t STT)
         char u = (fl.floor[i].upstate == fl_Up) ? 'U' : '-';
         char d = (fl.floor[i].downstate == fl_Down) ? 'D' : '-';
         char b = (ele.num[0].reserve[i] == ele_busy) ? 'B' : '-';
-        char a = (i == ele.num[0].absol_idx && (STT == abs_up || STT == abs_down)) ? '@' : ' ';
+        char a = (i == ele.num[0].absol_idx && (STT == force_up || STT == force_down)) ? '@' : ' ';
         printf("[%d:%c%c%c%c] ", i+1, u, d, b, a);
     }
     printf("\r\n-----------------------\r\n");
@@ -286,17 +311,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     {
         case GPIO_PIN_9: // 1층 (PA9)
             ele.num[0].current = 0;
+//            printf("PA9 detected!\n");
             break;
 
-        case GPIO_PIN_1: // 2층 (PA1)
+        case GPIO_PIN_0: // 2층 (PA0)
             ele.num[0].current = 1;
+//            printf("PA0 detected!\n");
             break;
 
-        case GPIO_PIN_4: // 3층 (PA4)
+        case GPIO_PIN_1: // 3층 (PA1)
             ele.num[0].current = 2;
             break;
 
-        case GPIO_PIN_0: // 4층 (PB0)
+        case GPIO_PIN_15: // 4층 (PA15)
             ele.num[0].current = 3;
             break;
 

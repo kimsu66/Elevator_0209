@@ -29,11 +29,11 @@
 #define SEG_E_PORT   GPIOA
 #define SEG_E_PIN    GPIO_PIN_7
 
-#define SEG_F_PORT   GPIOB
-#define SEG_F_PIN    GPIO_PIN_6
+#define SEG_F_PORT   GPIOC
+#define SEG_F_PIN    GPIO_PIN_7
 
-#define SEG_G_PORT   GPIOC
-#define SEG_G_PIN    GPIO_PIN_7
+#define SEG_G_PORT   GPIOA
+#define SEG_G_PIN    GPIO_PIN_8
 
 
 void segmentDisplay(uint8_t num);
