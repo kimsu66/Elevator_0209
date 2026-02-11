@@ -1,0 +1,7 @@
+Elevator project, using STM32
+
+2026.02.12
+
+KIM SOOYEON
+YOON JUNWOO
+JEON SIHYUN
